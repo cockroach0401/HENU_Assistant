@@ -106,13 +106,14 @@ account set --student-id <学号> --password '<密码>'
 calibration set --data '<请求体>' --cookie '<Cookie>'
 yuketang exam set --x-access-token '<考试系统令牌>'
 yuketang login
+yuketang logout
 ```
 
-事件监听器会在进模型前拦截这些命令；密码、Cookie、校准请求体、考试令牌与登录动作不会进入模型消息或历史。**群聊中的敏感命令会被拒绝。**
+事件监听器会在进模型前拦截这些命令；密码、Cookie、校准请求体、考试令牌与登录动作不会进入模型消息或历史。**群聊中的敏感命令会被拒绝。**此外私聊中的自然语言短语“登录雨课堂 / 帮我重新登录一下雨课堂 / 退出登录雨课堂”等（整句、指名雨课堂）会在进模型前直接执行对应登录/退出动作。
 
 ### 雨课堂（yuketang）配置
 
-按 QQ 隔离的雨课堂监听配置。开关是**总闸**，黑白名单决定**作用范围**（黑名单优先、课程名完全匹配）；exam 白名单为空等于考试功能整体关闭。课堂侧自动进班、自动答题、大模型**默认开**（`--auto-enter off` / `--auto-answer off` / `--llm off` 关闭；`--auto-enter off` 后开课不进班不答题，考试监听不受影响）。课件 PDF / PPT 进度 / 试卷文件推送（ppt/si/paper）已整体停用，不可配置。`--enter-delay` 为开班后进班延时（0-600 秒，默认 0），与 `start-time`（钟表几点前不进班）相互独立；主观题默认不作答，`--subjective on` 开启。数据存于该 QQ 的个人 Storage，守护进程每扫描周期重读，无需重启。
+按 QQ 隔离的雨课堂监听配置。开关是**总闸**，黑白名单决定**作用范围**（黑名单优先、课程名完全匹配）；exam 白名单为空等于考试功能整体关闭。课堂侧自动进班、自动答题、大模型**默认开**（`--auto-enter off` / `--auto-answer off` / `--llm off` 关闭；`--auto-enter off` 后开课不进班不答题，考试监听不受影响）。课件 PDF / PPT 进度 / 试卷文件推送（ppt/si/paper）已整体停用，不可配置。`--enter-delay` 为开班后进班延时（0-600 秒，默认 0），与 `start-time`（钟表几点前不进班）相互独立；主观题默认不作答，`--subjective on` 开启。`yuketang logout` 退出登录：清除守护进程侧 cookie 并停用监听（绑定与配置保留，自动续期不会把登录续回来；恢复用 `yuketang enable` + `yuketang login`）。数据存于该 QQ 的个人 Storage，守护进程每扫描周期重读，无需重启。
 
 #### 守护进程桥（可选）
 

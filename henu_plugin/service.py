@@ -188,6 +188,7 @@ class HenuPluginService:
             "yuketang_set_token": self._yuketang_set_token,
             "yuketang_account_set": self._yuketang_account_set,
             "yuketang_login": self._yuketang_login,
+            "yuketang_logout": self._yuketang_logout,
         }
 
     def get_sender_account_context(
@@ -1172,6 +1173,8 @@ class HenuPluginService:
                     except (ValueError, OSError):
                         pass
                 reply += "。守护进程将在到期前自动续期。"
+                if not config.get("enabled"):
+                    reply += "\n当前监听处于停用状态，发送 yuketang enable 恢复自动进班。"
                 return {"success": True, "msg": "yuketang 登录成功",
                         "reply_text": reply, "bridge": {"status": "login_ok"}}
             if status in {"failed", "expired"}:
@@ -1180,6 +1183,37 @@ class HenuPluginService:
                         "reply_text": f"登录失败（{detail}）。凭据仍保留，可重发 yuketang login 再试。"}
         return {"success": False, "msg": "登录超时",
                 "reply_text": "登录仍在进行（超过 160 秒），稍后用 `yuketang status` 查看结果。"}
+
+    def _yuketang_logout(self, params: dict[str, Any]) -> dict[str, Any]:
+        """退出登录：清守护进程侧 cookie 并停用监听（凭据与配置保留）。"""
+        openid = self._current_openid()
+        if not openid:
+            return {"success": False, "msg": "缺少身份",
+                    "reply_text": "无法确认当前聊天身份，请在私聊中操作。"}
+        try:
+            remote = bridge_client.logout(openid)
+        except bridge_client.BridgeError as exc:
+            return {
+                "success": False,
+                "msg": f"桥不可达: {exc}",
+                "reply_text": "守护进程桥不可达，无法清除登录态；本次未做任何变更，稍后再试 `yuketang logout`。",
+            }
+        if not remote.get("ok"):
+            return {"success": False, "msg": _text(remote.get("msg")) or "退出失败",
+                    "reply_text": f"退出登录失败：{_text(remote.get('msg'))}"}
+
+        result = self._yuketang_apply(yuketang_config.apply_logout)
+        had_cookie = bool(remote.get("had_cookie"))
+        base = "已退出雨课堂登录：守护进程侧 cookie 已清除" if had_cookie \
+            else "已退出雨课堂登录：原本就没有有效登录态"
+        reply = (
+            f"{base}，监听已停用。\n"
+            "绑定账号与配置都保留，自动续期不会把登录悄悄续回来。\n"
+            "重新登录：私聊发 `yuketang login`（或重新 `yuketang account set` 自动登录）；"
+            "恢复自动进班：`yuketang enable`。"
+        )
+        result["reply_text"] = reply
+        return result
 
 
 def _run_in_user_storage(storage_paths: UserStoragePaths, func: Callable[..., Any], *args: Any) -> Any:

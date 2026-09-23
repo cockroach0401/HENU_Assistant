@@ -436,6 +436,7 @@ def build_help_payload(topic: str) -> dict[str, Any]:
             "commands": [
                 "yuketang status",
                 "yuketang login [--force]   # cookie 仍有效时提示跳过；--force 强制重登",
+                "yuketang logout   # 退出登录：清守护进程侧 cookie 并停用监听（保留绑定）",
                 "yuketang account set --account <手机号> --password '<密码>'   # 敏感，仅私聊",
                 "yuketang config show [lesson|exam|other]",
                 "yuketang enable / yuketang disable",
@@ -1600,6 +1601,12 @@ def _parse_yuketang(raw: str, argv: tuple[str, ...]) -> CliCommandSpec:
             raw=raw, argv=argv, resolved_tool="yuketang_set_enabled",
             params={"enabled": "on" if sub in {"enable", "启用"} else "off"},
             action=f"yuketang {sub}", should_preload_runtime_context=False,
+        )
+
+    if sub in {"logout", "退出登录"}:
+        return CliCommandSpec(
+            raw=raw, argv=argv, resolved_tool="yuketang_logout", params={},
+            action="yuketang logout", should_preload_runtime_context=False,
         )
 
     if sub in {"config", "配置"}:

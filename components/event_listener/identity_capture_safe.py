@@ -9,6 +9,7 @@ from langbot_plugin.api.entities.builtin.provider import session as provider_ses
 
 from components.event_listener.identity_capture import IdentityCaptureListener
 from henu_plugin.cli import inspect_cli_command
+from henu_plugin.yuketang_nl import match_action as match_yuketang_action
 
 
 class SafeIdentityCaptureListener(IdentityCaptureListener):
@@ -22,7 +23,9 @@ class SafeIdentityCaptureListener(IdentityCaptureListener):
         "calibrate set",
         "yuketang account set",  # 含密码
         "yuketang login",        # 登录动作，仅私聊直处理
+        "yuketang logout",       # 退出登录，仅私聊直处理
         "yuketang 登录",
+        "yuketang 退出登录",
     )
     # yuketang 令牌命令只在含 --x-access-token 时视为敏感，其余 exam set 走正常模型链路。
     _YUKETANG_TOKEN_PREFIX = "yuketang exam set"
@@ -179,26 +182,35 @@ class SafeIdentityCaptureListener(IdentityCaptureListener):
             compact.startswith(self._YUKETANG_TOKEN_PREFIX)
             and self._YUKETANG_TOKEN_FLAG in text
         )
-        if not compact.startswith(self._SENSITIVE_PREFIXES) and not is_yuketang_token:
+        nl_action = match_yuketang_action(text)
+        is_sensitive = compact.startswith(self._SENSITIVE_PREFIXES) or is_yuketang_token
+        if not is_sensitive and nl_action is None:
             return
 
         if is_group:
             self._reply_and_stop(
                 ctx,
-                "账号密码、Cookie、校准请求、考试令牌和 yuketang 登录只能在私聊中执行；本条消息未发送给模型，也未执行。",
+                "账号密码、Cookie、校准请求、考试令牌和 yuketang 登录/退出登录"
+                "（含“登录雨课堂”等自然语言说法）只能在私聊中执行；本条消息未发送给模型，也未执行。",
             )
             return
 
-        spec = inspect_cli_command(text)
-        if spec.error or spec.resolved_tool not in {
-            "setup_account",
-            "set_calibration_source",
-            "yuketang_set_token",
-            "yuketang_account_set",
-            "yuketang_login",
-        }:
-            self._reply_and_stop(ctx, spec.error or "敏感命令格式无效。")
-            return
+        if nl_action is not None and not is_sensitive:
+            resolved_tool = "yuketang_login" if nl_action == "login" else "yuketang_logout"
+            params: dict[str, Any] = {}
+        else:
+            spec = inspect_cli_command(text)
+            if spec.error or spec.resolved_tool not in {
+                "setup_account",
+                "set_calibration_source",
+                "yuketang_set_token",
+                "yuketang_account_set",
+                "yuketang_login",
+                "yuketang_logout",
+            }:
+                self._reply_and_stop(ctx, spec.error or "敏感命令格式无效。")
+                return
+            resolved_tool, params = spec.resolved_tool, spec.params
 
         event = ctx.event
         launcher_type = self._normalize_launcher_type(
@@ -225,8 +237,8 @@ class SafeIdentityCaptureListener(IdentityCaptureListener):
                 session,
                 identity_hint,
                 self.plugin.service.run_tool,
-                spec.resolved_tool,
-                spec.params,
+                resolved_tool,
+                params,
                 session,
                 ctx.query_id,
                 identity_hint,
@@ -238,7 +250,10 @@ class SafeIdentityCaptureListener(IdentityCaptureListener):
         if isinstance(result, dict):
             if result.get("success"):
                 message = str(result.get("reply_text") or result.get("msg") or "操作完成")
-                message += "\n该命令已在调用模型前处理，密码或 Cookie 未进入模型上下文。"
+                if is_sensitive:
+                    message += "\n该命令已在调用模型前处理，密码或 Cookie 未进入模型上下文。"
+                else:
+                    message += "\n（已识别为雨课堂登录/退出请求，在进模型前直接处理，未经过模型。）"
             else:
                 message = str(result.get("reply_text") or result.get("msg") or "操作失败")
         else:

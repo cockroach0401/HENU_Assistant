@@ -17,6 +17,7 @@ from henu_plugin.cli import (  # noqa: E402
     redact_cli_params,
 )
 from henu_plugin import yuketang_config as ycfg  # noqa: E402
+from henu_plugin import yuketang_nl  # noqa: E402
 
 
 def _spec(command: str):
@@ -398,6 +399,48 @@ def test_enable_disable() -> None:
         assert not ycfg.apply_enabled(config, "maybe")["success"]
 
     _with_config_file(body)
+
+
+def test_yuketang_logout_parse_and_apply() -> None:
+    spec = _no_error("yuketang logout")
+    assert spec.resolved_tool == "yuketang_logout" and spec.params == {}
+    assert _no_error("yuketang 退出登录").resolved_tool == "yuketang_logout"
+
+    def body(config_file: Path) -> None:
+        config = ycfg.load_config(config_file)
+        ycfg.apply_enabled(config, "on")
+        result = ycfg.apply_logout(config)
+        assert result["success"], result["msg"]
+        assert config["enabled"] is False
+        assert config["credentials"]["account"] == ""  # 绑定凭据不动
+        ycfg.save_config(config_file, config)
+        assert ycfg.load_config(config_file)["enabled"] is False
+
+    _with_config_file(body)
+
+
+def test_yuketang_nl_match() -> None:
+    login_cases = [
+        "登录雨课堂", "登陆雨课堂", "帮我登录雨课堂", "请重新登录一下雨课堂",
+        "雨课堂登录", "雨课堂重新登录。", "yuketang登录", "给我登录一下雨课堂账号",
+    ]
+    for text in login_cases:
+        assert yuketang_nl.match_action(text) == "login", text
+
+    logout_cases = [
+        "退出登录雨课堂", "退出雨课堂", "雨课堂退出登录", "帮我注销雨课堂",
+        "请退出一下雨课堂账号", "yuketang退出登录",
+    ]
+    for text in logout_cases:
+        assert yuketang_nl.match_action(text) == "logout", text
+
+    negative_cases = [
+        "雨课堂登录失败怎么办", "怎么登录雨课堂", "雨课堂是什么",
+        "今天雨课堂登录了吗", "帮我看看雨课堂登录状态", "登录教务系统",
+        "退出群聊", "",
+    ]
+    for text in negative_cases:
+        assert yuketang_nl.match_action(text) is None, text
 
 
 # ---------- 账号密码登录命令族 ----------

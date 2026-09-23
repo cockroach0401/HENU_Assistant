@@ -397,6 +397,12 @@ def apply_enabled(config: dict[str, Any], enabled: Any) -> dict[str, Any]:
     return _result(f"雨课堂监听已{state}", f"雨课堂监听已{state}{note}", config)
 
 
+def apply_logout(config: dict[str, Any]) -> dict[str, Any]:
+    """退出登录的本地部分：停用监听，保留绑定凭据与全部配置。"""
+    config["enabled"] = False
+    return _result("已退出登录", "已停用监听；绑定账号与配置保留。", config)
+
+
 def apply_domain(config: dict[str, Any], domain: Any) -> dict[str, Any]:
     canonical = _normalize_domain_value(domain)
     if not canonical:
