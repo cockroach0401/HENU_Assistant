@@ -603,8 +603,7 @@ def apply_account_set(config: dict[str, Any], account: Any, password: Any) -> di
     config["credentials"]["account"] = account_text
     config["credentials"]["password"] = password_text
     reply = (
-        f"雨课堂账号已绑定（尾号 {account_text[-4:]}），凭据仅存于你的个人 Storage 并加密同步守护进程。\n"
-        "下一步：发送 `yuketang login` 完成登录（自动过验证码，约 1 分钟）。"
+        f"雨课堂账号已绑定（尾号 {account_text[-4:]}），凭据仅存于你的个人 Storage 并加密同步守护进程。"
     )
     return _result("已绑定雨课堂账号", reply, config)
 

@@ -5,6 +5,7 @@ import contextvars
 import hashlib
 import re
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -971,7 +972,7 @@ class HenuPluginService:
                     if expires else f"登录状态：已登录（{who}，有效期未知）"
                 )
             else:
-                notes.append("登录状态：未登录（yuketang login 可出二维码）")
+                notes.append("登录状态：未登录（私聊发送 yuketang account set 绑定并自动登录，或 yuketang login 登录）")
 
             local_config = yuketang_config.load_config(self._yuketang_config_path())
             local_hash = bridge_client.canonical_hash(
@@ -1082,11 +1083,28 @@ class HenuPluginService:
         )
 
     def _yuketang_account_set(self, params: dict[str, Any]) -> dict[str, Any]:
-        return self._yuketang_apply(
+        result = self._yuketang_apply(
             lambda config: yuketang_config.apply_account_set(
                 config, params.get("account"), params.get("password")
             )
         )
+        if not result.get("success"):
+            return result
+        push_status = (result.get("bridge") or {}).get("status")
+        if push_status == "ok":
+            login = self._yuketang_login({})
+            prefix = "\n—— 自动登录 ——\n"
+            result["reply_text"] = _text(result.get("reply_text"), strip=False) + prefix + _text(login.get("reply_text"), strip=False)
+            result["login"] = {"success": login.get("success"), "bridge": login.get("bridge")}
+        elif push_status in {"unreachable", "rejected"}:
+            result["reply_text"] = _text(result.get("reply_text"), strip=False) + (
+                "\n守护进程暂不可达：恢复后发送 `yuketang login` 完成登录。"
+            )
+        else:
+            result["reply_text"] = _text(result.get("reply_text"), strip=False) + (
+                "\n未接入守护进程桥：接入后发送 `yuketang login` 完成登录。"
+            )
+        return result
 
     def _yuketang_login(self, params: dict[str, Any]) -> dict[str, Any]:
         """调用守护进程密码登录并轮询结果。在 worker 线程内同步等待（~1 分钟）。"""
@@ -1098,8 +1116,27 @@ class HenuPluginService:
             return {
                 "success": False,
                 "msg": "未绑定雨课堂账号",
-                "reply_text": "尚未绑定雨课堂账号。请私聊发送：yuketang account set --account <手机号> --password '<密码>'，再执行 yuketang login。",
+                "reply_text": "尚未绑定雨课堂账号。请私聊发送：yuketang account set --account <手机号> --password '<密码>'（绑定后会自动登录）。",
             }
+        force = bool(params.get("force"))
+        if not force:
+            try:
+                live = bridge_client.fetch_status(openid)
+                cookie = live.get("cookie") if isinstance(live.get("cookie"), dict) else None
+                expires_ms = _int((cookie or {}).get("expires_ms"), 0)
+                if live.get("ok") and cookie and expires_ms > int(time.time() * 1000) + 3600_000:
+                    who = _text(cookie.get("username")) or "已登录"
+                    expires = _text(cookie.get("expires_at"))
+                    return {
+                        "success": True,
+                        "msg": "雨课堂已登录，未重新登录",
+                        "reply_text": (
+                            f"当前已登录：{who}，cookie 有效期至 {expires or '未知'}，到期前会自动续期。\n"
+                            "如需强制重新登录（例如换了密码）：yuketang login --force"
+                        ),
+                    }
+            except bridge_client.BridgeError:
+                pass  # 桥不可达时照旧走登录流程，由登录请求报错
         try:
             started = bridge_client.login_password(openid, account, password)
         except bridge_client.BridgeError as exc:
@@ -1112,10 +1149,10 @@ class HenuPluginService:
             return {"success": False, "msg": _text(started.get("msg")) or "启动登录失败",
                     "reply_text": f"启动登录失败：{_text(started.get('msg'))}"}
 
-        import time as _time
+        reused = bool(started.get("reused"))
         session_id = _text(started.get("session_id"))
         for _ in range(40):  # 最多 ~160 秒
-            _time.sleep(4)
+            time.sleep(4)
             try:
                 result = bridge_client.login_result(session_id)
             except bridge_client.BridgeError as exc:
@@ -1126,6 +1163,8 @@ class HenuPluginService:
                 username = _text(result.get("username"))
                 expires = _text(result.get("expires_at"))
                 reply = f"登录成功：{username or '已登录'}"
+                if reused:
+                    reply = "（复用进行中的登录会话）" + reply
                 if expires:
                     from datetime import datetime as _dt
                     try:

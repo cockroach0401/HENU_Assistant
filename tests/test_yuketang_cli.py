@@ -417,7 +417,10 @@ def test_yuketang_account_set_parse() -> None:
 def test_yuketang_login_parse() -> None:
     spec = _no_error("yuketang login")
     assert spec.resolved_tool == "yuketang_login"
+    assert spec.params == {"force": False}
     assert _no_error("yuketang 登录").resolved_tool == "yuketang_login"
+    spec = _no_error("yuketang login --force")
+    assert spec.resolved_tool == "yuketang_login" and spec.params == {"force": True}
 
 
 def test_apply_account_set_and_redaction() -> None:
