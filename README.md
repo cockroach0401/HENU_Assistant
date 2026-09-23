@@ -91,7 +91,7 @@ library reserve --location "<区域>" --seat-no "<座位号>" --date YYYY-MM-DD 
 seminar rooms --date YYYY-MM-DD --start 14:00 --end 16:00 --members 4
 seminar signin --auto-scan
 yuketang status
-yuketang lesson set --auto-answer on --llm on --subjective off --enter-delay 30
+yuketang lesson set --auto-enter on --auto-answer on --llm on --subjective off --enter-delay 30
 yuketang lesson whitelist add <课程名>
 yuketang exam set --master on
 confirm <token>
@@ -112,7 +112,7 @@ yuketang login
 
 ### 雨课堂（yuketang）配置
 
-按 QQ 隔离的雨课堂监听配置。开关是**总闸**，黑白名单决定**作用范围**（黑名单优先、课程名完全匹配）；exam 白名单为空等于考试功能整体关闭。课件 PDF / PPT 进度 / 试卷文件推送（ppt/si/paper）已整体停用，不可配置。`--enter-delay` 为开班后进班延时（0-600 秒，默认 0），与 `start-time`（钟表几点前不进班）相互独立；主观题默认不作答，`--subjective on` 开启。数据存于该 QQ 的个人 Storage，守护进程每扫描周期重读，无需重启。
+按 QQ 隔离的雨课堂监听配置。开关是**总闸**，黑白名单决定**作用范围**（黑名单优先、课程名完全匹配）；exam 白名单为空等于考试功能整体关闭。`--auto-enter off` 关闭自动进班（开课不进班、不答题，考试监听不受影响），默认开。课件 PDF / PPT 进度 / 试卷文件推送（ppt/si/paper）已整体停用，不可配置。`--enter-delay` 为开班后进班延时（0-600 秒，默认 0），与 `start-time`（钟表几点前不进班）相互独立；主观题默认不作答，`--subjective on` 开启。数据存于该 QQ 的个人 Storage，守护进程每扫描周期重读，无需重启。
 
 #### 守护进程桥（可选）
 

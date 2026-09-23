@@ -3,7 +3,8 @@
 存储文件 yuketang_config.json 由 PluginStorageAdapter 事务化装载/回写，
 本模块只做纯逻辑，不依赖 LangBot SDK。ppt/si/paper 为写保护键，永远 False。
 原版 config.json 的 lesson/exam/other 内层键名保持不变，守护进程可直接消费；
-新增 lesson.enterDelay（进班延时秒）与 lesson/exam 的 subjective（主观题开关）。
+新增 lesson.enterDelay（进班延时秒）、lesson.autoEnter（自动进班开关，默认开）
+与 lesson/exam 的 subjective（主观题开关）。
 """
 from __future__ import annotations
 
@@ -61,6 +62,7 @@ def default_config() -> dict[str, Any]:
             "si": False,
             "enterDelay": 0,
             "subjective": False,
+            "autoEnter": True,
         },
         "exam": {
             "classroomWhiteList": [],
@@ -136,6 +138,7 @@ def sanitize_config(raw: Any) -> dict[str, Any]:
     base["lesson"]["an"] = _coerce_bool(lesson.get("an"), False)
     base["lesson"]["enterDelay"] = _clamp_enter_delay(lesson.get("enterDelay"))
     base["lesson"]["subjective"] = _coerce_bool(lesson.get("subjective"), False)
+    base["lesson"]["autoEnter"] = _coerce_bool(lesson.get("autoEnter"), True)
 
     exam = raw.get("exam") if isinstance(raw.get("exam"), dict) else {}
     base["exam"]["classroomWhiteList"] = _clean_str_list(exam.get("classroomWhiteList"))
@@ -277,6 +280,7 @@ def redacted_config(config: dict[str, Any]) -> dict[str, Any]:
 
 def _lesson_summary(lesson: dict[str, Any]) -> str:
     parts = [
+        f"自动进班={_on_off_text(lesson['autoEnter'])}",
         f"自动答题={_on_off_text(lesson['an'])}",
         f"大模型={_on_off_text(lesson['llm'])}",
         f"主观题={_on_off_text(lesson['subjective'])}",
@@ -410,6 +414,13 @@ def apply_lesson_set(config: dict[str, Any], params: dict[str, Any]) -> dict[str
     lesson = config["lesson"]
     changed: list[str] = []
 
+    if params.get("auto_enter") not in (None, ""):
+        value, error = _parse_on_off(params.get("auto_enter"), "auto-enter")
+        if error:
+            return _result(error, error, config, success=False)
+        lesson["autoEnter"] = value
+        changed.append(f"自动进班={_on_off_text(value)}")
+
     if params.get("auto_answer") not in (None, ""):
         value, error = _parse_on_off(params.get("auto_answer"), "auto-answer")
         if error:
@@ -439,10 +450,12 @@ def apply_lesson_set(config: dict[str, Any], params: dict[str, Any]) -> dict[str
         changed.append(f"进班延时={value}秒")
 
     if not changed:
-        msg = "没有可更新的课堂配置项（支持 --auto-answer/--llm/--subjective/--enter-delay）。"
+        msg = "没有可更新的课堂配置项（支持 --auto-enter/--auto-answer/--llm/--subjective/--enter-delay）。"
         return _result(msg, msg, config, success=False)
 
     reply = "已更新课堂配置：" + " · ".join(changed)
+    if not lesson["autoEnter"]:
+        reply += "\n提示：自动进班已关，开课后不再进班/答题（考试监听不受影响）。"
     if lesson["an"] and not lesson["llm"]:
         reply += "\n提示：自动答题已开但大模型生成未开，无答案时会提交默认答案。"
     return _result("已更新课堂配置", reply, config)

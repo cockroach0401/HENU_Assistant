@@ -68,11 +68,14 @@ def test_yuketang_lesson_set() -> None:
     spec = _no_error("yuketang lesson set --auto-answer on --llm on --subjective off --enter-delay 30")
     assert spec.resolved_tool == "yuketang_lesson_set"
     assert spec.params == {
+        "auto_enter": "",
         "auto_answer": "on",
         "llm": "on",
         "subjective": "off",
         "enter_delay": "30",
     }
+    spec = _no_error("yuketang lesson set --auto-enter off")
+    assert spec.params["auto_enter"] == "off"
     assert "整体停用" in _error("yuketang lesson set --ppt on")
     assert "整体停用" in _error("yuketang lesson set --progress on")
     assert "整体停用" in _error("yuketang lesson set --si on")
@@ -232,6 +235,33 @@ def test_apply_lesson_set_rejects_bad_values() -> None:
         assert not result["success"]
         assert config["lesson"]["an"] is False
         assert config["lesson"]["enterDelay"] == 0
+
+    _with_config_file(body)
+
+
+def test_auto_enter_toggle_persists_and_defaults_on() -> None:
+    def body(config_file: Path) -> None:
+        config = ycfg.load_config(config_file)
+        assert config["lesson"]["autoEnter"] is True
+
+        result = ycfg.apply_lesson_set(config, {"auto_enter": "off"})
+        assert result["success"], result["msg"]
+        assert "自动进班=关" in result["reply_text"]
+        assert "不再进班" in result["reply_text"]
+        ycfg.save_config(config_file, config)
+        assert ycfg.load_config(config_file)["lesson"]["autoEnter"] is False
+
+        result = ycfg.apply_lesson_set(config, {"auto_enter": "开"})
+        assert result["success"] and "自动进班=开" in result["reply_text"]
+        assert not ycfg.apply_lesson_set(config, {"auto_enter": "maybe"})["success"]
+
+        status = ycfg.build_status_result(config)
+        assert "自动进班=开" in status["reply_text"]
+        show = ycfg.build_config_show_result(config, "lesson")
+        assert "自动进班=开" in show["reply_text"]
+
+        legacy = json.loads(json.dumps({**config, "lesson": {k: v for k, v in config["lesson"].items() if k != "autoEnter"}}))
+        assert ycfg.sanitize_config(legacy)["lesson"]["autoEnter"] is True
 
     _with_config_file(body)
 
