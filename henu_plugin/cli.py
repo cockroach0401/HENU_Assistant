@@ -457,7 +457,7 @@ def build_help_payload(topic: str) -> dict[str, Any]:
             ],
             "tips": [
                 "开关是总闸（对该 QQ 的全部课程生效），黑白名单决定范围；黑名单优先于白名单，课程名完全匹配。",
-                "--auto-enter 关闭后开课不再进班/答题，考试监听不受影响；默认开。",
+                "--auto-enter 关闭后开课不再进班/答题，考试监听不受影响；自动进班/自动答题/大模型默认开。",
                 "exam 白名单为空等于考试功能整体关闭（与 lesson 相反）。",
                 "课件 PDF / PPT 进度 / 试卷文件推送已整体停用，ppt/si/paper 不可配置。",
                 "--enter-delay 是“开班后等多久进班”（秒）；start-time 是“钟表几点前不进”，两者独立。",
@@ -483,7 +483,8 @@ def build_help_payload(topic: str) -> dict[str, Any]:
                 "yuketang lesson start-time set --course 未央.机器学习 --slots \"1=08:00\"",
             ],
             "tips": [
-                "--auto-enter 关：开课后不进班（不签到/不监听/不答题），默认开。",
+                "自动进班/自动答题/大模型默认开；主观题默认关。",
+                "--auto-enter 关：开课后不进班（不签到/不监听/不答题）。",
                 "--auto-answer 开而 --llm 关时，无答案会提交默认答案。",
                 "--subjective 默认关：主观题只打印不作答；开启后交由大模型生成并提交。",
                 "课程名与雨课堂首页课程标签完全匹配（含“未央.”等前缀）。",

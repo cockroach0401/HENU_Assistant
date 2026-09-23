@@ -178,6 +178,9 @@ def test_load_defaults_and_roundtrip() -> None:
         config = ycfg.load_config(config_file)
         assert config["enabled"] is False
         assert config["domain"] == "www.yuketang.cn"
+        assert config["lesson"]["autoEnter"] is True
+        assert config["lesson"]["an"] is True
+        assert config["lesson"]["llm"] is True
         assert config["lesson"]["enterDelay"] == 0
         assert config["lesson"]["subjective"] is False
         assert config["exam"]["subjective"] is False
@@ -233,7 +236,7 @@ def test_apply_lesson_set_rejects_bad_values() -> None:
         assert not result["success"]
         result = ycfg.apply_lesson_set(config, {"enter_delay": "999"})
         assert not result["success"]
-        assert config["lesson"]["an"] is False
+        assert config["lesson"]["an"] is True  # 默认开，失败操作不改值
         assert config["lesson"]["enterDelay"] == 0
 
     _with_config_file(body)
@@ -262,6 +265,13 @@ def test_auto_enter_toggle_persists_and_defaults_on() -> None:
 
         legacy = json.loads(json.dumps({**config, "lesson": {k: v for k, v in config["lesson"].items() if k != "autoEnter"}}))
         assert ycfg.sanitize_config(legacy)["lesson"]["autoEnter"] is True
+
+        # 存量配置缺键时按新默认补齐：自动进班/自动答题/大模型默认开
+        stripped = ycfg.sanitize_config({"lesson": {"subjective": True}})
+        assert stripped["lesson"]["autoEnter"] is True
+        assert stripped["lesson"]["an"] is True
+        assert stripped["lesson"]["llm"] is True
+        assert stripped["lesson"]["subjective"] is True
 
     _with_config_file(body)
 

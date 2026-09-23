@@ -3,8 +3,9 @@
 存储文件 yuketang_config.json 由 PluginStorageAdapter 事务化装载/回写，
 本模块只做纯逻辑，不依赖 LangBot SDK。ppt/si/paper 为写保护键，永远 False。
 原版 config.json 的 lesson/exam/other 内层键名保持不变，守护进程可直接消费；
-新增 lesson.enterDelay（进班延时秒）、lesson.autoEnter（自动进班开关，默认开）
-与 lesson/exam 的 subjective（主观题开关）。
+新增 lesson.enterDelay（进班延时秒）、lesson.autoEnter（自动进班开关）
+与 lesson/exam 的 subjective（主观题开关）。课堂侧自动进班/自动答题/大模型
+默认开，主观题默认关。
 """
 from __future__ import annotations
 
@@ -56,8 +57,8 @@ def default_config() -> dict[str, Any]:
             "classroomWhiteList": [],
             "classroomBlackList": [],
             "classroomStartTimeDict": {},
-            "llm": False,
-            "an": False,
+            "llm": True,
+            "an": True,
             "ppt": False,
             "si": False,
             "enterDelay": 0,
@@ -134,8 +135,8 @@ def sanitize_config(raw: Any) -> dict[str, Any]:
     base["lesson"]["classroomWhiteList"] = _clean_str_list(lesson.get("classroomWhiteList"))
     base["lesson"]["classroomBlackList"] = _clean_str_list(lesson.get("classroomBlackList"))
     base["lesson"]["classroomStartTimeDict"] = _clean_start_time_dict(lesson.get("classroomStartTimeDict"))
-    base["lesson"]["llm"] = _coerce_bool(lesson.get("llm"), False)
-    base["lesson"]["an"] = _coerce_bool(lesson.get("an"), False)
+    base["lesson"]["llm"] = _coerce_bool(lesson.get("llm"), True)
+    base["lesson"]["an"] = _coerce_bool(lesson.get("an"), True)
     base["lesson"]["enterDelay"] = _clamp_enter_delay(lesson.get("enterDelay"))
     base["lesson"]["subjective"] = _coerce_bool(lesson.get("subjective"), False)
     base["lesson"]["autoEnter"] = _coerce_bool(lesson.get("autoEnter"), True)
